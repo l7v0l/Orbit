@@ -10,12 +10,18 @@ import { supabase } from '@/lib/supabase/client';
 export default function ProfilePage() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [likedPosts, setLikedPosts] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'likes'>('posts');
   const [loading, setLoading] = useState<boolean>(true);
+  const [isFollowing, setIsFollowing] = useState<boolean>(false);
 
   useEffect(() => {
     const getProfileAndUserPosts = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
+
+        let profileData: any = null;
+
         if (user) {
           const { data: profile } = await supabase
             .from('profiles')
@@ -23,7 +29,7 @@ export default function ProfilePage() {
             .eq('id', user.id)
             .single();
 
-          const profileData = {
+          profileData = {
             id: user.id,
             email: user.email,
             ...(profile || user.user_metadata || { full_name: 'المدير العام (Super Admin)', username: 'l7v0l', is_verified: true, role: 'admin' }),
@@ -31,7 +37,7 @@ export default function ProfilePage() {
 
           setUserProfile(profileData);
 
-          // Fetch posts by this user
+          // Fetch posts created by this user
           const { data: posts } = await supabase
             .from('posts')
             .select('*, profiles(full_name, username, avatar_url, is_verified, role)')
@@ -41,29 +47,66 @@ export default function ProfilePage() {
           if (posts && posts.length > 0) {
             setUserPosts(posts);
           } else {
-            // Default demo post if no Supabase posts yet
+            // Demo post fallback if no DB posts yet
             setUserPosts([
               {
                 id: 'my-post-1',
                 user_id: user.id,
-                content: 'مرحباً بكم في ملفي الشخصي في منصة Orbit 🌌',
+                content: 'مرحباً بكم في ملفي الشخصي في منصة Orbit 🌌 منصة التدوين المصغر القادمة بقوة!',
                 created_at: new Date().toISOString(),
-                likes_count: 15,
+                likes_count: 24,
                 profiles: profileData,
               },
             ]);
           }
+
+          // Fetch liked posts from Supabase DB
+          const { data: likes } = await supabase
+            .from('likes')
+            .select('post_id, posts(*, profiles(full_name, username, avatar_url, is_verified, role))')
+            .eq('user_id', user.id);
+
+          if (likes && likes.length > 0) {
+            const formattedLikes = likes.map((l: any) => l.posts).filter(Boolean);
+            setLikedPosts(formattedLikes);
+          }
         } else {
           // Demo Admin Profile fallback
-          setUserProfile({
+          profileData = {
             id: 'admin-1',
             full_name: 'المدير العام (Super Admin)',
             username: 'l7v0l',
             bio: 'مطور منصة Orbit والمدير العام لشعارات وتوثيق الحسابات 🚀',
             is_verified: true,
             role: 'admin',
-          });
+          };
+          setUserProfile(profileData);
+
+          setUserPosts([
+            {
+              id: 'my-post-1',
+              user_id: 'admin-1',
+              content: 'مرحباً بكم في منصة Orbit! تم إطلاق جميع المميزات والصفحات بنجاح 🚀🌌',
+              created_at: new Date().toISOString(),
+              likes_count: 48,
+              profiles: profileData,
+            },
+          ]);
         }
+
+        // Merge liked posts from LocalStorage
+        try {
+          const localLikes: any[] = JSON.parse(localStorage.getItem('orbit_liked_posts') || '[]');
+          if (localLikes.length > 0) {
+            setLikedPosts((prev) => {
+              const map = new Map();
+              [...localLikes, ...prev].forEach((p) => {
+                if (p && p.id) map.set(p.id, p);
+              });
+              return Array.from(map.values());
+            });
+          }
+        } catch (e) {}
       } catch (err) {
         console.warn('Profile fetch error:', err);
       } finally {
@@ -73,6 +116,15 @@ export default function ProfilePage() {
 
     getProfileAndUserPosts();
   }, []);
+
+  // Filter posts with media (images or videos)
+  const mediaPosts = userPosts.filter(
+    (post) => (post.media_urls && post.media_urls.length > 0) || post.image_url
+  );
+
+  const handleDeletePost = (postId: string) => {
+    setUserPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
@@ -106,9 +158,18 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <button className="px-5 py-2 text-sm font-bold bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-200 rounded-full transition-all hover:scale-105">
-                تعديل الملف الشخصي
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsFollowing(!isFollowing)}
+                  className={`px-5 py-2 text-sm font-bold rounded-full transition-all ${
+                    isFollowing
+                      ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-red-500/20 hover:text-red-300'
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg'
+                  }`}
+                >
+                  {isFollowing ? 'تتابع الآن ✓' : 'متابعة 👤'}
+                </button>
+              </div>
             </div>
 
             {/* Profile Info Details */}
@@ -123,7 +184,7 @@ export default function ProfilePage() {
                     </span>
                   )}
                 </h2>
-                <span className="text-sm text-slate-400 dir-ltr">
+                <span className="text-sm text-slate-400 dir-ltr block">
                   @{userProfile?.username || 'orbit_user'}
                 </span>
               </div>
@@ -132,40 +193,120 @@ export default function ProfilePage() {
                 {userProfile?.bio || 'مرحباً بكم في حسابي الرسمي على منصة Orbit! 🌌 أحب التكنولوجيا والتدوين المصغر.'}
               </p>
 
+              {/* Followers & Following Stats */}
               <div className="flex gap-6 text-sm text-slate-400 pt-2 border-t border-slate-800/80">
-                <div>
-                  <strong className="text-slate-100 font-bold">142</strong> متابَعين
+                <div className="hover:text-purple-400 cursor-pointer transition-colors">
+                  <strong className="text-slate-100 font-bold ml-1">142</strong>
+                  <span>متابَعين (Following)</span>
                 </div>
-                <div>
-                  <strong className="text-slate-100 font-bold">1.2K</strong> متابِعون
+                <div className="hover:text-blue-400 cursor-pointer transition-colors">
+                  <strong className="text-slate-100 font-bold ml-1">
+                    {isFollowing ? '1,201' : '1,200'}
+                  </strong>
+                  <span>متابِعون (Followers)</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* User Posts Timeline Tabs */}
+          {/* User Profile Tabs Navigation */}
           <div className="mt-6 border-b border-slate-800 flex text-center font-bold text-sm text-slate-400">
-            <button className="flex-1 py-3 border-b-2 border-purple-500 text-slate-100">
+            <button
+              onClick={() => setActiveTab('posts')}
+              className={`flex-1 py-3 transition-colors relative ${
+                activeTab === 'posts' ? 'text-slate-100 border-b-2 border-purple-500' : 'hover:text-slate-200'
+              }`}
+            >
               المنشورات ({userPosts.length})
             </button>
-            <button className="flex-1 py-3 hover:text-slate-200 transition-colors">
-              الوسائط
+
+            <button
+              onClick={() => setActiveTab('media')}
+              className={`flex-1 py-3 transition-colors relative ${
+                activeTab === 'media' ? 'text-slate-100 border-b-2 border-purple-500' : 'hover:text-slate-200'
+              }`}
+            >
+              الوسائط ({mediaPosts.length})
             </button>
-            <button className="flex-1 py-3 hover:text-slate-200 transition-colors">
-              الإعجابات
+
+            <button
+              onClick={() => setActiveTab('likes')}
+              className={`flex-1 py-3 transition-colors relative ${
+                activeTab === 'likes' ? 'text-slate-100 border-b-2 border-purple-500' : 'hover:text-slate-200'
+              }`}
+            >
+              الإعجابات ({likedPosts.length})
             </button>
           </div>
 
-          {/* User Posts Feed List */}
-          <div className="p-4 divide-y divide-slate-800">
-            {userPosts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                currentUserId={userProfile?.id}
-                currentUserRole={userProfile?.role}
-              />
-            ))}
+          {/* Profile Tab Feed Content */}
+          <div className="p-4">
+            {loading ? (
+              <div className="text-center py-12 text-slate-500 text-sm animate-pulse">
+                جاري تحميل محتوى الملف الشخصي...
+              </div>
+            ) : activeTab === 'posts' ? (
+              userPosts.length > 0 ? (
+                <div className="divide-y divide-slate-800">
+                  {userPosts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUserId={userProfile?.id}
+                      currentUserRole={userProfile?.role}
+                      onDeletePost={handleDeletePost}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-500 text-sm">
+                  لا توجد منشورات مكتوبة بعد.
+                </div>
+              )
+            ) : activeTab === 'media' ? (
+              mediaPosts.length > 0 ? (
+                <div className="divide-y divide-slate-800">
+                  {mediaPosts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUserId={userProfile?.id}
+                      currentUserRole={userProfile?.role}
+                      onDeletePost={handleDeletePost}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-slate-900/40 rounded-3xl border border-slate-800 my-4 p-8">
+                  <div className="text-4xl mb-3">🖼️</div>
+                  <h3 className="font-bold text-lg text-slate-200 mb-2">لا توجد وسائط مرفوعة</h3>
+                  <p className="text-sm text-slate-400 max-w-sm mx-auto">
+                    عندما تقوم برفع صور أو فيديوهات في منشوراتك، ستظهر جميع الوسائط الخاصة بك في هذا التبويب.
+                  </p>
+                </div>
+              )
+            ) : (
+              likedPosts.length > 0 ? (
+                <div className="divide-y divide-slate-800">
+                  {likedPosts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUserId={userProfile?.id}
+                      currentUserRole={userProfile?.role}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-slate-900/40 rounded-3xl border border-slate-800 my-4 p-8">
+                  <div className="text-4xl mb-3">❤️</div>
+                  <h3 className="font-bold text-lg text-slate-200 mb-2">لم تقم بالإعجاب بأي منشورات بعد</h3>
+                  <p className="text-sm text-slate-400 max-w-sm mx-auto">
+                    اضغط على أيقونة الإعجاب ❤️ في أي منشور، وستظهر المنشورات التي نالت إعجابك هنا.
+                  </p>
+                </div>
+              )
+            )}
           </div>
         </main>
 

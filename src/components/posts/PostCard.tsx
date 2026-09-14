@@ -34,12 +34,47 @@ export default function PostCard({
       if (storedBookmarks.some((p) => p.id === post?.id)) {
         setBookmarked(true);
       }
+
+      const storedLikes: any[] = JSON.parse(localStorage.getItem('orbit_liked_posts') || '[]');
+      if (storedLikes.some((p) => p.id === post?.id)) {
+        setLiked(true);
+      }
     } catch (e) {}
   }, [post?.id]);
 
-  const toggleLike = () => {
-    setLiked(!liked);
-    setLikesCount((prev: number) => (liked ? prev - 1 : prev + 1));
+  const toggleLike = async () => {
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikesCount((prev: number) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+
+    // Save/Remove from LocalStorage for Likes tab in Profile
+    try {
+      let storedLikes: any[] = JSON.parse(localStorage.getItem('orbit_liked_posts') || '[]');
+      if (nextLiked) {
+        if (post && !storedLikes.some((p) => p.id === post.id)) {
+          storedLikes.unshift({ ...post, is_liked: true });
+        }
+      } else {
+        storedLikes = storedLikes.filter((p) => p.id !== post.id);
+      }
+      localStorage.setItem('orbit_liked_posts', JSON.stringify(storedLikes));
+    } catch (e) {
+      console.error('Like localStorage error:', e);
+    }
+
+    // Sync with Supabase likes DB table if user is logged in
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(post?.id);
+    if (currentUserId && isUuid) {
+      try {
+        if (nextLiked) {
+          await supabase.from('likes').insert([{ user_id: currentUserId, post_id: post.id }]);
+        } else {
+          await supabase.from('likes').delete().eq('user_id', currentUserId).eq('post_id', post.id);
+        }
+      } catch (err) {
+        console.warn('Supabase like sync notice:', err);
+      }
+    }
   };
 
   const toggleBookmark = async () => {
