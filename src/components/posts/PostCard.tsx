@@ -4,7 +4,19 @@ import React, { useState } from 'react';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { supabase } from '@/lib/supabase/client';
 
-export default function PostCard({ post, currentUserId, currentUserRole, onDeletePost }) {
+interface PostCardProps {
+  post: any;
+  currentUserId?: string | null;
+  currentUserRole?: string | null;
+  onDeletePost?: ((postId: string) => void) | null;
+}
+
+export default function PostCard({
+  post,
+  currentUserId = null,
+  currentUserRole = null,
+  onDeletePost = undefined,
+}: PostCardProps) {
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post?.likes_count || 0);
   const [bookmarked, setBookmarked] = useState(post?.is_bookmarked || false);
@@ -18,7 +30,7 @@ export default function PostCard({ post, currentUserId, currentUserRole, onDelet
 
   const toggleLike = () => {
     setLiked(!liked);
-    setLikesCount((prev) => (liked ? prev - 1 : prev + 1));
+    setLikesCount((prev: number) => (liked ? prev - 1 : prev + 1));
   };
 
   const toggleBookmark = async () => {
@@ -97,7 +109,7 @@ export default function PostCard({ post, currentUserId, currentUserRole, onDelet
         </p>
       )}
 
-      {/* Media Display (X-Style Grid Layout) */}
+      {/* Media Display */}
       {mediaUrls.length > 0 && (
         <div className="mb-4 rounded-2xl overflow-hidden border border-slate-800">
           {mediaType === 'video' ? (
@@ -114,7 +126,7 @@ export default function PostCard({ post, currentUserId, currentUserRole, onDelet
                   : 'grid-cols-2'
               }`}
             >
-              {mediaUrls.map((url, idx) => (
+              {mediaUrls.map((url: string, idx: number) => (
                 <div
                   key={idx}
                   className={`relative overflow-hidden bg-slate-950 ${
@@ -133,7 +145,7 @@ export default function PostCard({ post, currentUserId, currentUserRole, onDelet
         </div>
       )}
 
-      {/* Actions (Like, Comment, Repost, Bookmark) */}
+      {/* Actions */}
       <div className="flex items-center justify-between pt-3 border-t border-slate-800/60 text-slate-400 text-sm">
         <button
           onClick={toggleLike}

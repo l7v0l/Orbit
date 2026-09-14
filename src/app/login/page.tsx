@@ -25,9 +25,13 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        setError(authError.message === 'Invalid login credentials' 
-          ? 'اسم المستخدم أو كلمة المرور غير صحيحة' 
-          : authError.message);
+        if (authError.message.includes('Email not confirmed')) {
+          setError('لم يتم تأكيد البريد الإلكتروني بعد. ينبغي تنفيذ أمر تفعيل البريد في Supabase SQL Editor أو تعطيل Confirm Email.');
+        } else if (authError.message === 'Invalid login credentials') {
+          setError('اسم المستخدم أو كلمة المرور غير صحيحة');
+        } else {
+          setError(authError.message);
+        }
         setLoading(false);
         return;
       }
