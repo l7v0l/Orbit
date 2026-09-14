@@ -127,6 +127,20 @@ export default function PostCard({
     }
   };
 
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (previewIndex === null) return;
+      if (e.key === 'Escape') setPreviewIndex(null);
+      if (e.key === 'ArrowRight' && previewIndex > 0) setPreviewIndex(previewIndex - 1);
+      if (e.key === 'ArrowLeft' && previewIndex < mediaUrls.length - 1) setPreviewIndex(previewIndex + 1);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewIndex, mediaUrls.length]);
+
   return (
     <article className="p-4 bg-slate-900/40 border border-slate-800 rounded-2xl hover:border-slate-700 transition-all mb-4">
       {/* Header */}
@@ -177,7 +191,7 @@ export default function PostCard({
             <video src={mediaUrls[0]} controls className="w-full max-h-[480px] object-cover rounded-2xl" />
           ) : (
             <div
-              className={`grid gap-1 ${
+              className={`grid gap-1 cursor-pointer ${
                 mediaUrls.length === 1
                   ? 'grid-cols-1'
                   : mediaUrls.length === 2
@@ -190,19 +204,91 @@ export default function PostCard({
               {mediaUrls.map((url: string, idx: number) => (
                 <div
                   key={idx}
-                  className={`relative overflow-hidden bg-slate-950 ${
+                  onClick={() => setPreviewIndex(idx)}
+                  className={`relative overflow-hidden bg-slate-950 group ${
                     mediaUrls.length === 3 && idx === 0 ? 'row-span-2 h-full' : 'h-48'
                   }`}
                 >
                   <img
                     src={url}
                     alt={`post-media-${idx}`}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <span className="text-white text-sm font-bold bg-slate-950/80 px-3 py-1.5 rounded-full border border-slate-700 shadow-xl flex items-center gap-1">
+                      🔍 تكبير المعاينة
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Full-Screen X-style Media Lightbox Modal */}
+      {previewIndex !== null && mediaUrls[previewIndex] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 md:p-6"
+          onClick={() => setPreviewIndex(null)}
+        >
+          {/* Lightbox Header */}
+          <div className="flex justify-between items-center z-10" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewIndex(null)}
+              className="w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 flex items-center justify-center text-lg font-bold transition-all border border-slate-700"
+              title="إغلاق (Esc)"
+            >
+              ✕
+            </button>
+            <div className="text-slate-300 text-sm font-semibold bg-slate-900/80 px-4 py-1.5 rounded-full border border-slate-800">
+              صورة {previewIndex + 1} من {mediaUrls.length}
+            </div>
+            <a
+              href={mediaUrls[previewIndex]}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-purple-400 hover:text-purple-300 font-bold bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-800 transition-colors"
+            >
+              فتح الصورة ↗
+            </a>
+          </div>
+
+          {/* Lightbox Main Image & Navigation Arrows */}
+          <div className="relative flex-1 flex items-center justify-center my-4" onClick={(e) => e.stopPropagation()}>
+            {/* Prev Arrow */}
+            {previewIndex > 0 && (
+              <button
+                onClick={() => setPreviewIndex((prev) => (prev !== null ? prev - 1 : null))}
+                className="absolute right-4 md:right-8 z-20 w-12 h-12 rounded-full bg-slate-900/80 hover:bg-purple-600 text-white flex items-center justify-center text-xl font-bold shadow-2xl transition-all border border-slate-700"
+                title="الصورة السابقة (السهم الأيمن)"
+              >
+                ➔
+              </button>
+            )}
+
+            <img
+              src={mediaUrls[previewIndex]}
+              alt={`preview-full-${previewIndex}`}
+              className="max-h-[82vh] max-w-[92vw] object-contain rounded-2xl shadow-2xl select-none"
+            />
+
+            {/* Next Arrow */}
+            {previewIndex < mediaUrls.length - 1 && (
+              <button
+                onClick={() => setPreviewIndex((prev) => (prev !== null ? prev + 1 : null))}
+                className="absolute left-4 md:left-8 z-20 w-12 h-12 rounded-full bg-slate-900/80 hover:bg-purple-600 text-white flex items-center justify-center text-xl font-bold shadow-2xl transition-all border border-slate-700"
+                title="الصورة التالية (السهم الأيسر)"
+              >
+                ⬅
+              </button>
+            )}
+          </div>
+
+          {/* Lightbox Footer */}
+          <div className="text-center text-slate-400 text-xs z-10" onClick={(e) => e.stopPropagation()}>
+            {post?.profiles?.full_name && <span>معاينة الوسائط @{post?.profiles?.username} • منصة Orbit</span>}
+          </div>
         </div>
       )}
 
