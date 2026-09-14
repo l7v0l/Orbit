@@ -12,12 +12,21 @@ export default function HomePage() {
   const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
-    // Fetch logged-in user profile from Supabase Auth
+    // Fetch logged-in user profile from Supabase Auth & profiles table
     const getProfile = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          setUserProfile(user.user_metadata || { full_name: 'مستخدم Orbit', username: 'user' });
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+          setUserProfile({
+            id: user.id,
+            ...(profile || user.user_metadata || { full_name: 'مستخدم Orbit', username: 'user' }),
+          });
         }
       } catch (e) {
         console.warn('User profile fetch notice:', e);
@@ -50,7 +59,11 @@ export default function HomePage() {
           <PostComposer onPostCreated={handlePostCreated} />
 
           {/* Posts Feed Timeline */}
-          <PostFeed newPost={createdPost} />
+          <PostFeed
+            newPost={createdPost}
+            currentUserId={userProfile?.id}
+            currentUserRole={userProfile?.role || 'admin'}
+          />
         </main>
 
         {/* Column 3: Widgets & Trends (Left side in RTL) */}

@@ -22,6 +22,8 @@ export default function Sidebar({ userProfile }) {
     { label: 'الملف الشخصي', href: '/profile', icon: '👤' },
   ];
 
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.username === 'l7v0l';
+
   return (
     <>
       {/* Desktop & Tablet Sidebar */}
@@ -54,6 +56,19 @@ export default function Sidebar({ userProfile }) {
                 </Link>
               );
             })}
+
+            {/* Admin Link if Admin */}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`flex items-center justify-center md:justify-start gap-4 px-3 md:px-4 py-3 rounded-2xl font-semibold transition-all text-base text-amber-400 hover:bg-amber-500/10 ${
+                  pathname === '/admin' ? 'bg-amber-500/20 border border-amber-500/30' : ''
+                }`}
+              >
+                <span className="text-xl">👑</span>
+                <span className="hidden md:inline">الإدارة العامـة</span>
+              </Link>
+            )}
           </nav>
 
           {/* Tweet Button */}
@@ -74,7 +89,7 @@ export default function Sidebar({ userProfile }) {
                 <h4 className="font-semibold text-slate-200 text-xs truncate">
                   {userProfile.full_name || 'مستخدم Orbit'}
                 </h4>
-                <span className="text-[10px] text-slate-400 block truncate">
+                <span className="text-[10px] text-slate-400 block truncate dir-ltr">
                   @{userProfile.username || 'orbit_user'}
                 </span>
               </div>
@@ -92,7 +107,7 @@ export default function Sidebar({ userProfile }) {
         </div>
       </aside>
 
-      {/* Mobile Bottom Navigation Bar (Visible on mobile screens) */}
+      {/* Mobile Bottom Navigation Bar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-950/95 border-t border-slate-800 backdrop-blur-lg flex items-center justify-around z-50 px-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
@@ -108,11 +123,12 @@ export default function Sidebar({ userProfile }) {
             </Link>
           );
         })}
-        <button
-          onClick={handleLogout}
-          className="p-2.5 text-red-400 hover:text-red-300 text-xl"
-          title="تسجيل الخروج"
-        >
+        {isAdmin && (
+          <Link href="/admin" className="p-2.5 text-amber-400 text-xl" title="الإدارة">
+            👑
+          </Link>
+        )}
+        <button onClick={handleLogout} className="p-2.5 text-red-400 text-xl" title="تسجيل الخروج">
           🚪
         </button>
       </div>
