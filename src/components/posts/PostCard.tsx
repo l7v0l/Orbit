@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { supabase } from '@/lib/supabase/client';
 
@@ -28,6 +28,15 @@ export default function PostCard({
   const mediaUrls = post?.media_urls || (post?.image_url ? [post.image_url] : []);
   const mediaType = post?.media_type || (post?.image_url ? 'image' : 'image');
 
+  useEffect(() => {
+    try {
+      const storedBookmarks: any[] = JSON.parse(localStorage.getItem('orbit_bookmarks_posts') || '[]');
+      if (storedBookmarks.some((p) => p.id === post?.id)) {
+        setBookmarked(true);
+      }
+    } catch (e) {}
+  }, [post?.id]);
+
   const toggleLike = () => {
     setLiked(!liked);
     setLikesCount((prev: number) => (liked ? prev - 1 : prev + 1));
@@ -37,8 +46,25 @@ export default function PostCard({
     const nextState = !bookmarked;
     setBookmarked(nextState);
 
+    // Save/Remove from LocalStorage instantly
     try {
-      if (currentUserId) {
+      let storedBookmarks: any[] = JSON.parse(localStorage.getItem('orbit_bookmarks_posts') || '[]');
+      if (nextState) {
+        if (post && !storedBookmarks.some((p) => p.id === post.id)) {
+          storedBookmarks.unshift({ ...post, is_bookmarked: true });
+        }
+      } else {
+        storedBookmarks = storedBookmarks.filter((p) => p.id !== post.id);
+      }
+      localStorage.setItem('orbit_bookmarks_posts', JSON.stringify(storedBookmarks));
+    } catch (e) {
+      console.error('Bookmark localStorage error:', e);
+    }
+
+    // Sync with Supabase DB if user is logged in & post.id is UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(post?.id);
+    try {
+      if (currentUserId && isUuid) {
         if (nextState) {
           await supabase.from('bookmarks').insert([{ user_id: currentUserId, post_id: post.id }]);
         } else {
@@ -46,7 +72,7 @@ export default function PostCard({
         }
       }
     } catch (err) {
-      console.error('Bookmark toggle error:', err);
+      console.warn('Supabase bookmark sync notice:', err);
     }
   };
 

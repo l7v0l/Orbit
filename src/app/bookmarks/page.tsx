@@ -21,8 +21,17 @@ export default function BookmarksPage() {
             id: user.id,
             ...(user.user_metadata || { full_name: 'مستخدم Orbit', username: 'user' }),
           });
+        }
 
-          // Fetch user bookmarks joining posts and profiles
+        // 1. Get bookmarks from localStorage
+        let localBookmarks: any[] = [];
+        try {
+          localBookmarks = JSON.parse(localStorage.getItem('orbit_bookmarks_posts') || '[]');
+        } catch (e) {}
+
+        // 2. Get bookmarks from Supabase DB if user is logged in
+        let dbPosts: any[] = [];
+        if (user) {
           const { data: bookmarks, error } = await supabase
             .from('bookmarks')
             .select('post_id, posts(*, profiles(full_name, username, avatar_url, is_verified, role))')
@@ -30,13 +39,22 @@ export default function BookmarksPage() {
             .order('created_at', { ascending: false });
 
           if (!error && bookmarks && bookmarks.length > 0) {
-            const formattedPosts = bookmarks
+            dbPosts = bookmarks
               .map((b: any) => b.posts)
               .filter(Boolean)
               .map((p: any) => ({ ...p, is_bookmarked: true }));
-            setBookmarkedPosts(formattedPosts);
           }
         }
+
+        // Merge local & DB bookmarks uniquely by ID
+        const combinedMap = new Map();
+        [...localBookmarks, ...dbPosts].forEach((p) => {
+          if (p && p.id) {
+            combinedMap.set(p.id, { ...p, is_bookmarked: true });
+          }
+        });
+
+        setBookmarkedPosts(Array.from(combinedMap.values()));
       } catch (err) {
         console.warn('Bookmarks fetch fallback:', err);
       } finally {
@@ -49,6 +67,11 @@ export default function BookmarksPage() {
 
   const handleDeletePost = (postId: string) => {
     setBookmarkedPosts((prev) => prev.filter((p) => p.id !== postId));
+    try {
+      let storedBookmarks: any[] = JSON.parse(localStorage.getItem('orbit_bookmarks_posts') || '[]');
+      storedBookmarks = storedBookmarks.filter((p) => p.id !== postId);
+      localStorage.setItem('orbit_bookmarks_posts', JSON.stringify(storedBookmarks));
+    } catch (e) {}
   };
 
   return (
