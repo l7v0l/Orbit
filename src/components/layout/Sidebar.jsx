@@ -19,6 +19,7 @@ export default function Sidebar({ userProfile }) {
     { label: 'الرئيسية', href: '/home', icon: '🏠' },
     { label: 'استكشف', href: '/explore', icon: '🔍' },
     { label: 'التنبيهات', href: '/notifications', icon: '🔔' },
+    { label: 'المفضلة', href: '/bookmarks', icon: '🔖' },
     { label: 'الملف الشخصي', href: '/profile', icon: '👤' },
   ];
 
@@ -57,7 +58,7 @@ export default function Sidebar({ userProfile }) {
               );
             })}
 
-            {/* Admin Link if Admin */}
+            {/* Admin Link */}
             {isAdmin && (
               <Link
                 href="/admin"

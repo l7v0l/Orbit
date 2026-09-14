@@ -7,14 +7,35 @@ import { supabase } from '@/lib/supabase/client';
 export default function PostCard({ post, currentUserId, currentUserRole, onDeletePost }) {
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post?.likes_count || 0);
+  const [bookmarked, setBookmarked] = useState(post?.is_bookmarked || false);
 
   const isAuthor = currentUserId && post?.user_id === currentUserId;
   const isAdmin = currentUserRole === 'admin';
   const canDelete = isAuthor || isAdmin;
 
+  const mediaUrls = post?.media_urls || (post?.image_url ? [post.image_url] : []);
+  const mediaType = post?.media_type || (post?.image_url ? 'image' : 'image');
+
   const toggleLike = () => {
     setLiked(!liked);
     setLikesCount((prev) => (liked ? prev - 1 : prev + 1));
+  };
+
+  const toggleBookmark = async () => {
+    const nextState = !bookmarked;
+    setBookmarked(nextState);
+
+    try {
+      if (currentUserId) {
+        if (nextState) {
+          await supabase.from('bookmarks').insert([{ user_id: currentUserId, post_id: post.id }]);
+        } else {
+          await supabase.from('bookmarks').delete().eq('user_id', currentUserId).eq('post_id', post.id);
+        }
+      }
+    } catch (err) {
+      console.error('Bookmark toggle error:', err);
+    }
   };
 
   const handleDelete = async () => {
@@ -46,7 +67,6 @@ export default function PostCard({ post, currentUserId, currentUserRole, onDelet
               <h4 className="font-semibold text-slate-200 text-sm">
                 {post?.profiles?.full_name || 'Orbit User'}
               </h4>
-              {/* Show Verified Badge if user is verified or if team */}
               {(post?.profiles?.is_verified || post?.profiles?.username === 'orbit_team' || post?.profiles?.username === 'l7v0l') && (
                 <VerifiedBadge size={16} />
               )}
@@ -57,12 +77,12 @@ export default function PostCard({ post, currentUserId, currentUserRole, onDelet
           </div>
         </div>
 
-        {/* Admin or Author Delete Action */}
+        {/* Delete Action */}
         {canDelete && (
           <button
             onClick={handleDelete}
             className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors text-xs flex items-center gap-1"
-            title="حذف المنشور (صلاحيات المدير/صاحب المنشور)"
+            title="حذف المنشور"
           >
             <span>🗑️</span>
             {isAdmin && !isAuthor && <span className="text-[10px] bg-red-500/20 text-red-300 px-1.5 py-0.5 rounded font-bold">Admin</span>}
@@ -70,12 +90,50 @@ export default function PostCard({ post, currentUserId, currentUserRole, onDelet
         )}
       </div>
 
-      {/* Content */}
-      <p className="text-slate-300 text-base leading-relaxed mb-4">
-        {post?.content || 'مرحباً بكم في شبكة Orbit للتدوين المصغر!'}
-      </p>
+      {/* Content Text */}
+      {post?.content && (
+        <p className="text-slate-300 text-base leading-relaxed mb-3 whitespace-pre-wrap">
+          {post.content}
+        </p>
+      )}
 
-      {/* Actions */}
+      {/* Media Display (X-Style Grid Layout) */}
+      {mediaUrls.length > 0 && (
+        <div className="mb-4 rounded-2xl overflow-hidden border border-slate-800">
+          {mediaType === 'video' ? (
+            <video src={mediaUrls[0]} controls className="w-full max-h-[480px] object-cover rounded-2xl" />
+          ) : (
+            <div
+              className={`grid gap-1 ${
+                mediaUrls.length === 1
+                  ? 'grid-cols-1'
+                  : mediaUrls.length === 2
+                  ? 'grid-cols-2'
+                  : mediaUrls.length === 3
+                  ? 'grid-cols-2'
+                  : 'grid-cols-2'
+              }`}
+            >
+              {mediaUrls.map((url, idx) => (
+                <div
+                  key={idx}
+                  className={`relative overflow-hidden bg-slate-950 ${
+                    mediaUrls.length === 3 && idx === 0 ? 'row-span-2 h-full' : 'h-48'
+                  }`}
+                >
+                  <img
+                    src={url}
+                    alt={`post-media-${idx}`}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actions (Like, Comment, Repost, Bookmark) */}
       <div className="flex items-center justify-between pt-3 border-t border-slate-800/60 text-slate-400 text-sm">
         <button
           onClick={toggleLike}
@@ -93,6 +151,17 @@ export default function PostCard({ post, currentUserId, currentUserRole, onDelet
         <button className="flex items-center gap-1.5 hover:text-purple-400 transition-colors">
           <span>🔁</span>
           <span>إعادة نشر</span>
+        </button>
+
+        <button
+          onClick={toggleBookmark}
+          className={`flex items-center gap-1.5 transition-colors ${
+            bookmarked ? 'text-amber-400 font-bold' : 'hover:text-amber-400'
+          }`}
+          title={bookmarked ? 'إزالة من المفضلة' : 'حفظ في المفضلة'}
+        >
+          <span>{bookmarked ? '🔖' : '🏷️'}</span>
+          <span className="hidden sm:inline">{bookmarked ? 'محفوظ' : 'المفضلة'}</span>
         </button>
       </div>
     </article>
